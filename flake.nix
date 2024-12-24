@@ -37,14 +37,22 @@
           devShells = {
             default  = let
               # These packages get built by Nix, and will be ahead on the PATH
-                pwp = (python311.withPackages (p: with p; [
+              pwp = (python312.withPackages (p: with p;
+                let
+                  mytorch = torchWithCuda;
+                  # Override torch to avoid conflict
+                  myaccelerate = accelerate.override { torch = mytorch; };
+                  myxformers = xformers.override { torch = mytorch; };
+                  in
+                      [
                      venvShellHook
                      python-lsp-server
                      python-lsp-ruff
                      diffusers
-                     torchWithCuda
                      transformers
-                     accelerate
+                     mytorch
+                     myaccelerate
+                     myxformers
                 ]));
             in mkShell {
                NIX_LD = runCommand "ld.so" {} ''
@@ -54,11 +62,14 @@
                 packages = [
                   pwp
                   ruff
+                  # mpkgs.python312Packages.accelerate
+                  # (pkgs.python312Packages.accelerate.override { pytorch = pwp.torchWithCuda; })
+                  
                 ]
                 ++ libList;
                 shellHook = ''
-                    export PYTHONPATH=${pwp}/${pwp.sitePackages}:$PYTHONPATH
-                    export PATH=${pre-commit}/bin:${ruff}/bin:$PATH
+                                    export PYTHONPATH=${pwp}/${pwp.sitePackages}:$PYTHONPATH
+                    export PATH=${ruff}/bin:$PATH
                 '';
              };
           };
